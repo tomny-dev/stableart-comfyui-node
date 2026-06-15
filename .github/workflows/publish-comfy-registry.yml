@@ -1,0 +1,28 @@
+name: Publish to Comfy Registry
+
+# This workflow lives INSIDE the plugin so it ships to the public mirror repo and
+# runs there (GitHub only runs workflows from a repo's root .github/workflows, so
+# it is inert in the StableArt monorepo). It publishes to the Comfy Registry when
+# the version in pyproject.toml changes.
+#
+# Setup in the public repo (one-time):
+#   - Create a publisher at https://registry.comfy.org and a publisher API key.
+#   - Repo secret  REGISTRY_ACCESS_TOKEN = that API key.
+#   - Ensure pyproject.toml [tool.comfy] PublisherId matches your publisher.
+
+on:
+  push:
+    branches: [main]
+    paths: ["pyproject.toml"]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish node
+        # Comfy docs reference @main (no stable version tag is published).
+        uses: Comfy-Org/publish-node-action@main
+        with:
+          personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}

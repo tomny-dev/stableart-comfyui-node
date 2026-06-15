@@ -1,0 +1,19 @@
+# StableArt ComfyUI job plugin — operator config.
+#
+# Copy this file to `config.toml` (same directory) and fill it in, OR set the
+# equivalent environment variables before launching ComfyUI. Environment
+# variables take precedence over this file. Every key is optional except the
+# API key — without it the plugin logs a warning and stays idle (ComfyUI still
+# starts normally). The broker URL defaults to broker.stableart.io.
+#
+# Keys here are snake_case; the matching env var is shown in the comment.
+
+# broker_base_url      = "https://broker.stableart.io"   # env: NODE_BROKER_URL (this is the default)
+# api_key              = "<gateway api key>"             # env: GATEWAY_API_KEY  (operator account)
+# node_name            = "RTX 5090 Plugin Node"          # env: NODE_NAME
+# negative_prompt      = "bad hands"                     # env: COMFYUI_NEGATIVE_PROMPT (last-resort fallback)
+# poll_interval_ms     = 1000                            # env: COMFYUI_POLL_INTERVAL_MS
+# heartbeat_interval_ms = 15000                          # env: HEARTBEAT_INTERVAL_MS
+# job_timeout_ms       = 120000                          # env: NODE_JOB_TIMEOUT_MS
+# gpu_name             = "NVIDIA GeForce RTX 5090"       # env: NODE_GPU_NAME (else auto-detected via nvidia-smi)
+# node_id_file         = "data/node-id"                  # env: NODE_ID_FILE (relative to the plugin dir)

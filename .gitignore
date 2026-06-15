@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Local runtime state and operator config (never commit). Root-anchored so it
+# does NOT match the bundled comfyui_job_plugin/workflows/data/ JSONs.
+/data/
+config.toml

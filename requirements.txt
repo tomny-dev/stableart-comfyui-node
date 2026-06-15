@@ -1,0 +1,6 @@
+# Runtime dependencies for the StableArt ComfyUI job plugin.
+# Kept in sync with [project.dependencies] in pyproject.toml. ComfyUI-Manager
+# installs from this file; the registry/comfy-cli toolchain reads pyproject.
+websocket-client>=1.7
+requests>=2.31
+tomli>=2.0; python_version < "3.11"

@@ -1,0 +1,8 @@
+# Exclude dev-only files from the published Comfy Registry package
+# (.gitignore syntax). Operators don't need these.
+tests/
+PUBLISHING.md
+AGENTS.md
+.venv/
+__pycache__/
+*.egg-info/
