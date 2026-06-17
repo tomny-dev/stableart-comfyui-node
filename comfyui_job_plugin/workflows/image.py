@@ -13,7 +13,7 @@ from ..jobs.schemas import ImageGenerationPayload
 from .checkpoints import resolve_checkpoint
 from .loader import WorkflowGraph, WorkflowPatch, load_workflow, patch_workflow
 
-DEFAULT_STEPS = 20
+DEFAULT_STEPS = 28
 DEFAULT_CLIP_NAME1 = "clip_l.safetensors"
 DEFAULT_CLIP_NAME2 = "t5/t5xxl_fp16.safetensors"
 DEFAULT_CLIP_TYPE = "sdxl"

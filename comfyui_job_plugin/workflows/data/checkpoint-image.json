@@ -3,10 +3,10 @@
     "class_type": "KSampler",
     "inputs": {
       "seed": 0,
-      "steps": 20,
+      "steps": 28,
       "cfg": 5,
       "sampler_name": "euler_ancestral",
-      "scheduler": "normal",
+      "scheduler": "karras",
       "denoise": 1,
       "model": ["4", 0],
       "positive": ["6", 0],
