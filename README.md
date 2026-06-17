@@ -42,17 +42,16 @@ Three ways, in precedence order (highest first):
 Only the **API key** is required — set it (via any of the above) or the plugin logs a warning and
 stays idle (ComfyUI still starts normally). The broker URL defaults to `broker.stableart.io`.
 
-| Env var | `config.toml` key | Required | Default | Meaning |
-|---|---|---|---|---|
-| `GATEWAY_API_KEY` | `api_key` | Yes | — | Operator (owner/admin) API key |
-| `NODE_BROKER_URL` | `broker_base_url` | No | `https://broker.stableart.io` | Broker base URL (`http(s)`, auto-upgraded to `ws(s)`) |
-| `NODE_NAME` | `node_name` | No | `ComfyUI Plugin Node` | Label shown in the dashboard |
-| `COMFYUI_NEGATIVE_PROMPT` | `negative_prompt` | No | `bad hands` | Last-resort fallback when a job sends no negative prompt |
-| `COMFYUI_POLL_INTERVAL_MS` | `poll_interval_ms` | No | `1000` | `/history` poll cadence |
-| `HEARTBEAT_INTERVAL_MS` | `heartbeat_interval_ms` | No | `15000` | Heartbeat cadence |
-| `NODE_JOB_TIMEOUT_MS` | `job_timeout_ms` | No | `120000` | Per-job timeout when broker omits one |
-| `NODE_GPU_NAME` | `gpu_name` | No | `nvidia-smi` | Override auto-detected GPU name |
-| `NODE_ID_FILE` | `node_id_file` | No | `data/node-id` | Where the assigned node id persists |
+| Env var                    | `config.toml` key       | Required | Default                       | Meaning                                               |
+| -------------------------- | ----------------------- | -------- | ----------------------------- | ----------------------------------------------------- |
+| `GATEWAY_API_KEY`          | `api_key`               | Yes      | —                             | Operator (owner/admin) API key                        |
+| `NODE_BROKER_URL`          | `broker_base_url`       | No       | `https://broker.stableart.io` | Broker base URL (`http(s)`, auto-upgraded to `ws(s)`) |
+| `NODE_NAME`                | `node_name`             | No       | `ComfyUI Plugin Node`         | Label shown in the dashboard                          |
+| `COMFYUI_POLL_INTERVAL_MS` | `poll_interval_ms`      | No       | `1000`                        | `/history` poll cadence                               |
+| `HEARTBEAT_INTERVAL_MS`    | `heartbeat_interval_ms` | No       | `15000`                       | Heartbeat cadence                                     |
+| `NODE_JOB_TIMEOUT_MS`      | `job_timeout_ms`        | No       | `120000`                      | Per-job timeout when broker omits one                 |
+| `NODE_GPU_NAME`            | `gpu_name`              | No       | `nvidia-smi`                  | Override auto-detected GPU name                       |
+| `NODE_ID_FILE`             | `node_id_file`          | No       | `data/node-id`                | Where the assigned node id persists                   |
 
 The assigned `nodeId` is written to `data/node-id` and re-sent on reconnect, so the node keeps the
 same identity across ComfyUI restarts. Keep that file.

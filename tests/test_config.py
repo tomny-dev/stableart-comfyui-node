@@ -4,7 +4,6 @@ _ENV_VARS = [
     "NODE_BROKER_URL",
     "GATEWAY_API_KEY",
     "NODE_NAME",
-    "COMFYUI_NEGATIVE_PROMPT",
     "NODE_GPU_NAME",
     "NODE_ID_FILE",
     "COMFYUI_POLL_INTERVAL_MS",
@@ -35,7 +34,6 @@ def test_defaults_when_unset(tmp_path, monkeypatch):
     cfg = load_config(tmp_path)
     assert cfg.node_name == "ComfyUI Plugin Node"
     assert cfg.broker_base_url == "https://broker.stableart.io"  # default broker
-    assert cfg.negative_prompt == "bad hands"
     assert cfg.poll_interval_ms == 1000
     assert cfg.job_timeout_ms == 120000
     assert not cfg.is_runnable  # broker defaults, but no api key → idle

@@ -29,11 +29,13 @@ class BuiltWorkflow:
 def build_image_workflow(
     opts: ImageGenerationPayload,
     installed_models: list[str],
-    default_negative: str,
 ) -> BuiltWorkflow:
+    # The node is a generic executor: it carries no default negative prompt. The
+    # app owns prompt scaffolding (positive quality tags + negative) and sends both,
+    # so an absent negative just means no negative conditioning.
     seed = opts.seed if opts.seed is not None else random.randint(0, 999_999)
     steps = opts.steps if opts.steps is not None else DEFAULT_STEPS
-    negative = opts.negative_prompt or default_negative
+    negative = opts.negative_prompt or ""
 
     if opts.workflow_file:
         workflow = load_workflow(opts.workflow_file)

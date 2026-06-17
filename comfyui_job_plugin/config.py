@@ -31,7 +31,6 @@ _ENV = {
     "broker_base_url": ("NODE_BROKER_URL", "broker_base_url"),
     "api_key": ("GATEWAY_API_KEY", "api_key"),
     "node_name": ("NODE_NAME", "node_name"),
-    "negative_prompt": ("COMFYUI_NEGATIVE_PROMPT", "negative_prompt"),
     "gpu_name": ("NODE_GPU_NAME", "gpu_name"),
     "node_id_file": ("NODE_ID_FILE", "node_id_file"),
 }
@@ -59,7 +58,6 @@ class PluginConfig:
     broker_base_url: str
     api_key: str
     node_name: str
-    negative_prompt: str
     poll_interval_ms: int
     heartbeat_interval_ms: int
     job_timeout_ms: int
@@ -181,7 +179,6 @@ def load_config(plugin_dir: Path, *, protocol_version: int = 1) -> PluginConfig:
     ).rstrip("/")
     api_key = _resolve_str(file_cfg, "api_key", "") or ""
     node_name = _resolve_str(file_cfg, "node_name", "ComfyUI Plugin Node") or "ComfyUI Plugin Node"
-    negative_prompt = _resolve_str(file_cfg, "negative_prompt", "bad hands") or "bad hands"
     gpu_name = resolve_gpu_name(_resolve_str(file_cfg, "gpu_name", None))
 
     node_id_file_raw = _resolve_str(file_cfg, "node_id_file", None)
@@ -198,7 +195,6 @@ def load_config(plugin_dir: Path, *, protocol_version: int = 1) -> PluginConfig:
         broker_base_url=broker_base_url,
         api_key=api_key,
         node_name=node_name,
-        negative_prompt=negative_prompt,
         poll_interval_ms=_resolve_int(file_cfg, "poll_interval_ms"),
         heartbeat_interval_ms=_resolve_int(file_cfg, "heartbeat_interval_ms"),
         job_timeout_ms=_resolve_int(file_cfg, "job_timeout_ms"),

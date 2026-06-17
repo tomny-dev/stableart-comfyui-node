@@ -47,7 +47,7 @@ def generate_image(
 ) -> JobResult:
     try:
         installed = comfy.fetch_available_models() or []
-        built = build_image_workflow(payload, installed, config.negative_prompt)
+        built = build_image_workflow(payload, installed)
 
         prompt_id = comfy.submit_workflow(built.workflow, "generate")
         try:

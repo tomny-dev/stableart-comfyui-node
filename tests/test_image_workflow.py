@@ -15,7 +15,10 @@ def _payload(**overrides):
 
 
 def test_checkpoint_workflow_patches():
-    built = build_image_workflow(_payload(seed=42, steps=30), ["anime_xl.safetensors"], "bad neg")
+    built = build_image_workflow(
+        _payload(seed=42, steps=30, negative_prompt="bad neg"),
+        ["anime_xl.safetensors"],
+    )
     wf = built.workflow
     assert built.seed == 42
     assert wf["3"]["inputs"]["seed"] == 42
@@ -27,16 +30,16 @@ def test_checkpoint_workflow_patches():
     assert wf["7"]["inputs"]["text"] == "bad neg"
 
 
-def test_defaults_steps_and_random_seed_and_negative_fallback():
-    built = build_image_workflow(_payload(), [], "fallback-neg")
+def test_defaults_steps_and_random_seed_and_empty_negative():
+    built = build_image_workflow(_payload(), [])
     assert built.workflow["3"]["inputs"]["steps"] == DEFAULT_STEPS
     assert 0 <= built.seed <= 999_999
-    # negative_prompt unset -> config default
-    assert built.workflow["7"]["inputs"]["text"] == "fallback-neg"
+    # No negative provided and the node carries no default -> empty negative.
+    assert built.workflow["7"]["inputs"]["text"] == ""
 
 
-def test_explicit_negative_overrides_default():
-    built = build_image_workflow(_payload(negative_prompt="ugly"), [], "fallback")
+def test_explicit_negative_is_used():
+    built = build_image_workflow(_payload(negative_prompt="ugly"), [])
     assert built.workflow["7"]["inputs"]["text"] == "ugly"
 
 
@@ -44,7 +47,6 @@ def test_diffusion_model_workflow_uses_separate_loaders_and_defaults():
     built = build_image_workflow(
         _payload(model_source="diffusion_model", checkpoint="flux_dev"),
         ["flux_dev.safetensors"],
-        "neg",
     )
     wf = built.workflow
     assert wf["4"]["class_type"] == "UNETLoader"
@@ -66,7 +68,6 @@ def test_diffusion_model_honours_explicit_encoders():
             vae_name="custom_ae.safetensors",
         ),
         ["flux_dev.safetensors"],
-        "neg",
     )
     wf = built.workflow
     assert wf["10"]["inputs"]["clip_name1"] == "clip_g.safetensors"
@@ -77,7 +78,7 @@ def test_diffusion_model_honours_explicit_encoders():
 
 def test_builder_does_not_mutate_bundled_graph():
     # Two builds must be independent — the loader deep-copies the bundled JSON.
-    first = build_image_workflow(_payload(seed=1), ["anime_xl.safetensors"], "n")
-    second = build_image_workflow(_payload(seed=2), ["anime_xl.safetensors"], "n")
+    first = build_image_workflow(_payload(seed=1), ["anime_xl.safetensors"])
+    second = build_image_workflow(_payload(seed=2), ["anime_xl.safetensors"])
     assert first.workflow["3"]["inputs"]["seed"] == 1
     assert second.workflow["3"]["inputs"]["seed"] == 2
