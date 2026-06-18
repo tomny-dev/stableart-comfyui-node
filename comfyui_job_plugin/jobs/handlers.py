@@ -16,7 +16,12 @@ from ..logging_util import log
 from ..workflows.caption import extract_caption_from_outputs, sanitize_filename
 from ..workflows.image import build_image_workflow
 from ..workflows.loader import WorkflowPatch, load_workflow, patch_workflow
-from .schemas import AiCaptionPayload, ImageGenerationPayload, JobPayload
+from .schemas import (
+    AiCaptionPayload,
+    ImageGenerationPayload,
+    JobPayload,
+    UpscaleAppPayload,
+)
 
 # Returns True when the running job should stop polling (abandoned / superseded).
 AbortCheck = Callable[[], bool]
@@ -135,6 +140,66 @@ def run_ai_caption(
         return JobFailure("internal_error", str(error))
 
 
+def run_upscale(
+    payload: UpscaleAppPayload,
+    timeout_ms: int,
+    comfy: ComfyApiClient,
+    config: PluginConfig,
+    should_abort: AbortCheck | None = None,
+) -> JobResult:
+    job_input = payload.input
+    try:
+        try:
+            image_bytes = base64.b64decode(job_input.image_data, validate=True)
+        except (binascii.Error, ValueError):
+            return JobFailure("invalid_payload", "Failed to decode uploaded image")
+        if not image_bytes:
+            return JobFailure("invalid_payload", "Uploaded image was empty")
+
+        filename = sanitize_filename(job_input.filename, job_input.image_content_type)
+        uploaded_name = comfy.upload_image(
+            image_bytes, job_input.image_content_type, filename
+        )
+
+        workflow = load_workflow("upscale-image")
+        patched = patch_workflow(
+            workflow,
+            [
+                WorkflowPatch("1", "image", uploaded_name),
+                WorkflowPatch("2", "model_name", job_input.upscale_model),
+            ],
+        )
+
+        prompt_id = comfy.submit_workflow(patched, "upscale-image")
+        try:
+            outputs = comfy.wait_for_outputs(prompt_id, timeout_ms, should_abort)
+        finally:
+            comfy.delete_history(prompt_id)
+
+        for output in outputs.values():
+            images = output.get("images") if isinstance(output, dict) else None
+            if not images:
+                continue
+            meta = images[0]
+            try:
+                data, content_type = comfy.view_image(
+                    meta["filename"], meta.get("subfolder", ""), meta.get("type", "")
+                )
+            except Exception as error:  # noqa: BLE001 - try the next output, like generate_image
+                log("Failed to download upscaled image", error)
+                continue
+            return JobSuccess(
+                content_type=content_type,
+                data=base64.b64encode(data).decode("ascii"),
+            )
+
+        return JobFailure("invalid_result", "ComfyUI did not produce an upscaled image")
+    except ComfyApiError as error:
+        return JobFailure(error.code, error.details)
+    except Exception as error:  # noqa: BLE001 - mirror the TS catch-all
+        return JobFailure("internal_error", str(error))
+
+
 def execute_job(
     payload: JobPayload,
     timeout_ms: int,
@@ -146,4 +211,6 @@ def execute_job(
         return generate_image(payload, timeout_ms, comfy, config, should_abort)
     if isinstance(payload, AiCaptionPayload):
         return run_ai_caption(payload, timeout_ms, comfy, config, should_abort)
+    if isinstance(payload, UpscaleAppPayload):
+        return run_upscale(payload, timeout_ms, comfy, config, should_abort)
     return JobFailure("invalid_result", "Unsupported job payload")

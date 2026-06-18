@@ -183,3 +183,29 @@ def delete_model(models_dir: Path, folder: str, filename: str) -> bool:
         return False  # missing, or a directory — unlink would raise
     dest.unlink()
     return True
+
+
+def merge_installed_file(
+    models: list[str],
+    models_by_folder: dict[str, list[str]] | None,
+    folder: str,
+    filename: str,
+) -> None:
+    """Ensure a just-installed file appears in a reported model snapshot even when
+    ComfyUI's (cached) folder listing hasn't picked it up yet.
+
+    A download writes ``folder/filename`` straight to disk, but ComfyUI's HTTP model
+    listing can keep returning a stale list for a moment afterwards — so a snapshot
+    built purely from it would omit the new file, and the gateway's install-truth
+    gate would reject jobs that need it. Merging the file the node *knows* it just
+    installed closes that window. Mutates the passed structures in place.
+    """
+    if not folder or not filename:
+        return
+    if models_by_folder is not None:
+        files = models_by_folder.setdefault(folder, [])
+        if filename not in files:
+            files.append(filename)
+    # The flat list is checkpoints + diffusion only (the picker / v1 reconciliation).
+    if folder in ("checkpoints", "diffusion_models") and filename not in models:
+        models.append(filename)

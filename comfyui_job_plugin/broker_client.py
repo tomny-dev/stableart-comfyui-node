@@ -10,6 +10,8 @@ so at most one job is in flight, matching the broker's one-job-per-node model.
 from __future__ import annotations
 
 import json
+import os
+import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -143,7 +145,7 @@ class BrokerClient:
             self._handle_welcome(message)
         elif msg_type == "job":
             self._handle_job(message)
-        elif msg_type in ("model.install", "model.delete"):
+        elif msg_type in ("model.install", "model.delete", "node.restart"):
             self._handle_management(message)
         else:
             log("Received unknown message from broker", message)
@@ -195,7 +197,11 @@ class BrokerClient:
 
         threading.Thread(target=loop, args=(self._hb_stop,), daemon=True).start()
 
-    def _report_models(self, ws: websocket.WebSocketApp) -> None:
+    def _report_models(
+        self,
+        ws: websocket.WebSocketApp,
+        ensure: tuple[str, str] | None = None,
+    ) -> None:
         if self._comfy is None:
             return
         try:
@@ -209,6 +215,14 @@ class BrokerClient:
             # gateway keeps its last good registry instead of seeing a partial list.
             log("Skipping model report; a folder listing failed")
             return
+        # Guarantee a just-installed file is reported even if ComfyUI's cached folder
+        # listing hasn't caught up yet (see models.merge_installed_file).
+        if ensure is not None:
+            from . import models as model_ops
+
+            model_ops.merge_installed_file(
+                models, models_by_folder, ensure[0], ensure[1]
+            )
         log(f"Reporting {len(models)} available models to broker")
         message: dict[str, Any] = {"type": "models", "models": models}
         # Omit the per-folder snapshot if any folder listing failed, so the gateway
@@ -346,10 +360,20 @@ class BrokerClient:
 
         command_id = message["commandId"]
         msg_type = message["type"]
+        if msg_type == "node.restart":
+            self._restart_comfyui()
+            return
+        # On a successful install, the file we just wrote is merged into the report
+        # so a stale ComfyUI listing can't make it look missing.
+        ensure: tuple[str, str] | None = None
         try:
             models_dir = model_ops.resolve_models_dir()
             if msg_type == "model.install":
                 self._install_model(command_id, message, models_dir, model_ops)
+                ensure = (
+                    str(message.get("folder") or ""),
+                    str(message.get("filename") or ""),
+                )
             else:  # model.delete
                 folder = str(message.get("folder") or "")
                 filename = str(message.get("filename") or "")
@@ -363,7 +387,23 @@ class BrokerClient:
             return
         # Re-report installed models (filesystem truth) after a successful change.
         if self._ws is not None:
-            self._report_models(self._ws)
+            self._report_models(self._ws, ensure=ensure)
+
+    def _restart_comfyui(self) -> None:
+        """Restart the ComfyUI process on operator request. Re-exec in place when
+        possible (no supervisor required); if that fails, exit non-zero so a
+        container/systemd restart policy brings ComfyUI back. Deferred briefly so
+        the log line flushes and the management thread unwinds first."""
+        log("Operator requested a ComfyUI restart; restarting the process")
+
+        def _go() -> None:
+            try:
+                os.execv(sys.executable, [sys.executable, *sys.argv])
+            except Exception as error:  # noqa: BLE001 - fall back to a hard exit
+                log("Re-exec failed; exiting for a supervisor restart", error)
+                os._exit(1)
+
+        threading.Timer(1.0, _go).start()
 
     def _install_model(self, command_id, message, models_dir, model_ops) -> None:
         folder = str(message.get("folder") or "")

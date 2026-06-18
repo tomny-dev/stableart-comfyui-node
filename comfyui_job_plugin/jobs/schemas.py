@@ -64,7 +64,22 @@ class AiCaptionPayload:
     input: AiCaptionInput
 
 
-JobPayload = ImageGenerationPayload | AiCaptionPayload
+@dataclass(frozen=True)
+class UpscaleInput:
+    image_data: str
+    image_content_type: str
+    upscale_model: str
+    filename: str | None = None
+
+
+@dataclass(frozen=True)
+class UpscaleAppPayload:
+    kind: str
+    app_slug: str
+    input: UpscaleInput
+
+
+JobPayload = ImageGenerationPayload | AiCaptionPayload | UpscaleAppPayload
 
 
 def _require_str(data: dict[str, Any], key: str) -> str:
@@ -165,6 +180,31 @@ def _parse_ai_caption(data: dict[str, Any]) -> AiCaptionPayload:
     )
 
 
+def _parse_upscale(data: dict[str, Any]) -> UpscaleAppPayload:
+    raw_input = data.get("input")
+    if not isinstance(raw_input, dict):
+        raise PayloadError("`input` must be an object")
+
+    return UpscaleAppPayload(
+        kind="app_run",
+        app_slug="upscale-image",
+        input=UpscaleInput(
+            image_data=_require_str(raw_input, "imageData"),
+            image_content_type=_require_str(raw_input, "imageContentType"),
+            filename=_opt_str(raw_input, "filename"),
+            upscale_model=_require_str(raw_input, "upscaleModel"),
+        ),
+    )
+
+
+# Dispatch an ``app_run`` payload by its ``appSlug``. Each app has its own input
+# contract, so the slug — not just ``kind`` — selects the parser.
+_APP_RUN_PARSERS = {
+    "ai-caption": _parse_ai_caption,
+    "upscale-image": _parse_upscale,
+}
+
+
 def parse_job_payload(data: Any) -> JobPayload:
     """Validate a raw job payload dict into a typed payload, by ``kind``."""
     if not isinstance(data, dict):
@@ -173,5 +213,8 @@ def parse_job_payload(data: Any) -> JobPayload:
     if kind == "image_generation":
         return _parse_image_generation(data)
     if kind == "app_run":
-        return _parse_ai_caption(data)
+        parser = _APP_RUN_PARSERS.get(data.get("appSlug"))
+        if parser is None:
+            raise PayloadError("unsupported appSlug")
+        return parser(data)
     raise PayloadError(f"unsupported job kind: {kind!r}")

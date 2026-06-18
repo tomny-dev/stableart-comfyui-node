@@ -4,6 +4,7 @@ from comfyui_job_plugin.jobs.schemas import (
     AiCaptionPayload,
     ImageGenerationPayload,
     PayloadError,
+    UpscaleAppPayload,
     parse_job_payload,
 )
 
@@ -100,6 +101,38 @@ def test_parse_ai_caption():
     assert isinstance(payload, AiCaptionPayload)
     assert payload.input.model == "joy"
     assert payload.input.prompt_style == "descriptive"
+
+
+def test_parse_upscale():
+    payload = parse_job_payload(
+        {
+            "kind": "app_run",
+            "appSlug": "upscale-image",
+            "input": {
+                "imageData": "Zm9v",
+                "imageContentType": "image/png",
+                "filename": "pic.png",
+                "upscaleModel": "4x-UltraSharp.pth",
+            },
+        }
+    )
+    assert isinstance(payload, UpscaleAppPayload)
+    assert payload.input.upscale_model == "4x-UltraSharp.pth"
+    assert payload.input.filename == "pic.png"
+
+
+def test_parse_upscale_rejects_missing_model():
+    with pytest.raises(PayloadError):
+        parse_job_payload(
+            {
+                "kind": "app_run",
+                "appSlug": "upscale-image",
+                "input": {
+                    "imageData": "Zm9v",
+                    "imageContentType": "image/png",
+                },
+            }
+        )
 
 
 def test_parse_rejects_unknown_kind():

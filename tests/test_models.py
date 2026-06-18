@@ -7,9 +7,40 @@ from comfyui_job_plugin import models
 from comfyui_job_plugin.models import (
     delete_model,
     download_model,
+    merge_installed_file,
     safe_target_path,
     verify_file_sha256,
 )
+
+
+def test_merge_installed_file_adds_missing_folder_entry():
+    # A stale ComfyUI listing omitted the just-installed upscale model.
+    by_folder: dict[str, list[str]] = {}
+    flat: list[str] = []
+    merge_installed_file(flat, by_folder, "upscale_models", "4x-UltraSharp.pth")
+    assert by_folder["upscale_models"] == ["4x-UltraSharp.pth"]
+    # Upscale models aren't in the flat checkpoint list.
+    assert flat == []
+
+
+def test_merge_installed_file_is_idempotent_and_handles_flat():
+    by_folder = {"checkpoints": ["a.safetensors"]}
+    flat = ["a.safetensors"]
+    merge_installed_file(flat, by_folder, "checkpoints", "a.safetensors")
+    assert by_folder["checkpoints"] == ["a.safetensors"]  # no duplicate
+    assert flat == ["a.safetensors"]
+    # A checkpoint not yet in the (cached) flat list is added.
+    merge_installed_file(flat, by_folder, "checkpoints", "b.safetensors")
+    assert by_folder["checkpoints"] == ["a.safetensors", "b.safetensors"]
+    assert flat == ["a.safetensors", "b.safetensors"]
+
+
+def test_merge_installed_file_tolerates_no_snapshot_and_blanks():
+    flat: list[str] = []
+    merge_installed_file(flat, None, "upscale_models", "x.pth")  # no by-folder snapshot
+    merge_installed_file(flat, {}, "", "x.pth")  # blank folder
+    merge_installed_file(flat, {}, "upscale_models", "")  # blank filename
+    assert flat == []
 
 
 def test_safe_target_path_allows_listed_folder_and_subdirs(tmp_path):

@@ -12,6 +12,21 @@ def test_load_workflow_reads_bundled_graph():
     assert wf["4"]["class_type"] == "CheckpointLoaderSimple"
 
 
+def test_upscale_workflow_loads_and_patches():
+    wf = load_workflow("upscale-image")
+    assert wf["2"]["class_type"] == "UpscaleModelLoader"
+    assert wf["3"]["class_type"] == "ImageUpscaleWithModel"
+    patched = patch_workflow(
+        wf,
+        [
+            WorkflowPatch("1", "image", "uploaded.png"),
+            WorkflowPatch("2", "model_name", "4x-UltraSharp.pth"),
+        ],
+    )
+    assert patched["1"]["inputs"]["image"] == "uploaded.png"
+    assert patched["2"]["inputs"]["model_name"] == "4x-UltraSharp.pth"
+
+
 @pytest.mark.parametrize(
     "bad",
     ["../data/checkpoint-image", "..\\data\\checkpoint-image", "a/b", "x.json", ""],
