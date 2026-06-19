@@ -22,11 +22,13 @@ def build_connection_url(
     gpu: str,
     node_id: int | None,
     protocol_version: int,
+    plugin_version: str | None = None,
 ) -> str:
     """Build the ``/nodes/connect`` WebSocket URL with query params.
 
     ``nodeId`` is only included when known (reconnect). ``protocol`` is always
-    sent so the broker can detect this is a versioned client.
+    sent so the broker can detect this is a versioned client. ``plugin_version``,
+    when set, is reported so the dashboard can show which build a node is running.
     """
     base = broker_base_url.rstrip("/")
     params: list[tuple[str, str]] = [("name", name)]
@@ -35,4 +37,6 @@ def build_connection_url(
     if gpu:
         params.append(("gpu", gpu))
     params.append(("protocol", str(protocol_version)))
+    if plugin_version:
+        params.append(("version", plugin_version))
     return to_websocket_url(f"{base}/nodes/connect?{urlencode(params)}")

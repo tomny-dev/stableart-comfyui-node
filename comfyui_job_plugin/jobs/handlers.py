@@ -51,7 +51,9 @@ def generate_image(
     should_abort: AbortCheck | None = None,
 ) -> JobResult:
     try:
-        installed = comfy.fetch_available_models() or []
+        # Pass ComfyUI's registered folders so an unregistered diffusion_models
+        # doesn't sink the installed-model list used to resolve the checkpoint.
+        installed = comfy.fetch_available_models(comfy.list_model_folders()) or []
         built = build_image_workflow(payload, installed)
 
         prompt_id = comfy.submit_workflow(built.workflow, "generate")

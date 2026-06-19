@@ -34,6 +34,10 @@ class ComfyApiClient:
         # management, and models-report paths all use this client concurrently.
         # Hand out a per-thread Session instead.
         self._local = threading.local()
+        # ComfyUI's registered model folders are static for the process lifetime
+        # (set at import), so cache them after the first successful /models call to
+        # keep the per-job critical path off an extra HTTP round-trip.
+        self._cached_model_folders: list[str] | None = None
 
     @property
     def _session(self) -> requests.Session:
@@ -64,6 +68,14 @@ class ComfyApiClient:
         "upscale_models",
     )
 
+    # Legacy folder name → its canonical replacement. Modern ComfyUI merged the old
+    # `clip` directory into `text_encoders` (its paths include the legacy `clip/`
+    # dir), so such builds list `text_encoders` from /models but not `clip`, and a
+    # direct /models/clip 500s like any unregistered folder. We mirror the canonical
+    # snapshot under the legacy key so the gateway can still reconcile catalog
+    # entries filed under the old folder (see kindToFolder: clip → "clip").
+    _LEGACY_FOLDER_ALIASES = {"clip": "text_encoders"}
+
     def _list_folder(self, folder: str) -> list[str] | None:
         """Installed filenames in a managed folder, or None if the listing failed.
 
@@ -85,18 +97,26 @@ class ComfyApiClient:
             return None
         return list(dict.fromkeys(m for m in listed if isinstance(m, str)))
 
-    def fetch_available_models(self) -> list[str] | None:
+    def fetch_available_models(self, available: list[str] | None) -> list[str] | None:
         """List installed checkpoints + diffusion models (deduped), or None if a
-        listing failed.
+        required listing failed.
 
         This flat list feeds the user-facing checkpoint picker, so it intentionally
         excludes vae/lora/etc.; use :meth:`fetch_models_by_folder` for reconciliation.
-        Returns None (rather than a partial list) when a folder listing fails, so the
-        caller can avoid clobbering the broker's registry with a half-empty list that
-        would make valid checkpoints look missing.
+
+        ``available`` is ComfyUI's registered model folders (from
+        :meth:`list_model_folders`), shared with the per-folder report so we don't
+        re-discover. ``diffusion_models`` only exists on newer builds, so it's queried
+        only when registered (or when ``available`` is None — /models unavailable):
+        otherwise an unregistered ``diffusion_models`` would 500 and sink the whole
+        report. Returns None when a folder we *do* query fails, so the caller skips
+        the report rather than clobbering the registry with a half-empty list.
         """
+        folders = ["checkpoints"]
+        if available is None or "diffusion_models" in available:
+            folders.append("diffusion_models")
         models: list[str] = []
-        for folder in ("checkpoints", "diffusion_models"):
+        for folder in folders:
             files = self._list_folder(folder)
             if files is None:
                 return None
@@ -104,23 +124,85 @@ class ComfyApiClient:
                 models.extend(files)
         return list(dict.fromkeys(models))
 
-    def fetch_models_by_folder(self) -> dict[str, list[str]] | None:
+    def list_model_folders(self) -> list[str] | None:
+        """ComfyUI's registered model folder names (``GET /models``), or None if the
+        endpoint isn't available.
+
+        Different ComfyUI builds register different model folders (e.g.
+        ``text_encoders`` / ``diffusion_models`` only on newer versions). Asking
+        ComfyUI which folders it actually has lets the reports query only those, so
+        we never hit a managed folder this build doesn't know (which 500s and used to
+        sink the whole snapshot).
+
+        Cached after the first success (the folder set is static per process), so the
+        per-job generation path doesn't repeat this HTTP call. A failure isn't cached,
+        so a transient /models error retries next time."""
+        if self._cached_model_folders is not None:
+            return self._cached_model_folders
+        try:
+            response = self._session.get(f"{self._base_url}/models", timeout=15)
+            if not response.ok:
+                return None
+            listed = response.json()
+        except (requests.RequestException, ValueError):
+            return None
+        if not isinstance(listed, list):
+            return None
+        folders = [name for name in listed if isinstance(name, str)]
+        self._cached_model_folders = folders
+        return folders
+
+    def fetch_models_by_folder(
+        self, available: list[str] | None
+    ) -> dict[str, list[str]] | None:
         """Map each managed folder → its installed filenames (filesystem truth),
-        or None if any folder listing failed.
+        or None to skip the report.
 
         Lets the gateway reconcile install state for every managed folder, not just
-        checkpoints. Empty folders are omitted to keep the payload small. Returning
-        None on a partial failure tells the caller to skip the snapshot rather than
-        report one that looks like deletions (the gateway then keeps the last good
-        snapshot).
+        checkpoints. Empty folders are omitted to keep the payload small.
+
+        Aligns to ComfyUI: ``available`` is ComfyUI's registered model folders (from
+        :meth:`list_model_folders`), so we query only the managed folders this build
+        registers — a folder it lacks is never queried (older builds return a 500, not
+        a 404, for an unregistered folder, which is what used to sink the snapshot).
+        An empty ``available`` means ComfyUI authoritatively registers no model
+        folders, so we query none. ``available`` is None only when /models is
+        unavailable, where we fall back to the full managed set.
+
+        If a folder we *do* query fails to list, return None (skip the whole report)
+        rather than a partial map: the gateway treats a folder absent from
+        ``modelsByFolder`` as an authoritative empty, so a partial snapshot would mark
+        that folder's installed models deleted until the next full report. Reporting
+        None makes the gateway keep its last good snapshot. Thanks to discovery, a
+        failure here is a transient/registered-folder error, not a missing folder. The
+        None-fallback is best-effort: without discovery we can't tell an unregistered
+        folder from a transient error, so a failure there still aborts (deliberately,
+        to avoid the partial-snapshot problem); in practice every current ComfyUI
+        exposes /models, so the fallback is rarely hit.
         """
+        folders = (
+            [f for f in self._MANAGED_FOLDERS if f in available]
+            if available is not None
+            else list(self._MANAGED_FOLDERS)
+        )
         result: dict[str, list[str]] = {}
-        for folder in self._MANAGED_FOLDERS:
+        for folder in folders:
             files = self._list_folder(folder)
             if files is None:
+                log(f"Could not list model folder {folder!r}; skipping this snapshot")
                 return None
             if files:
                 result[folder] = files
+
+        # Mirror canonical snapshots under any legacy alias this build merged away
+        # (e.g. clip → text_encoders). Only when the alias isn't separately
+        # registered — if ComfyUI still exposes it as its own folder we already
+        # queried it above and its listing is authoritative (setdefault keeps it).
+        # Skipped when available is None (the fallback queries both folders directly).
+        if available is not None:
+            for alias, canonical in self._LEGACY_FOLDER_ALIASES.items():
+                if alias not in available and canonical in result:
+                    result.setdefault(alias, result[canonical])
         return result
 
     # ---- prompt submission --------------------------------------------------

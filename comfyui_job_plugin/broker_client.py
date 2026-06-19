@@ -25,6 +25,7 @@ from .jobs.schemas import PayloadError, parse_job_payload
 from .logging_util import log
 from .server_ready import await_server_ready
 from .urls import build_connection_url
+from .version import __version__ as PLUGIN_VERSION
 
 _MAX_BACKOFF_MS = 30_000
 
@@ -104,6 +105,7 @@ class BrokerClient:
             gpu=self._config.gpu_name,
             node_id=self._known_node_id,
             protocol_version=self._config.protocol_version,
+            plugin_version=PLUGIN_VERSION,
         )
         descriptor = f" as node {self._known_node_id}" if self._known_node_id else ""
         log(f"Connecting to broker{descriptor} ({url}) [GPU: {self._config.gpu_name}]")
@@ -205,8 +207,12 @@ class BrokerClient:
         if self._comfy is None:
             return
         try:
-            models = self._comfy.fetch_available_models()
-            models_by_folder = self._comfy.fetch_models_by_folder()
+            # Discover ComfyUI's registered model folders once and reuse it for both
+            # reports, so neither queries a folder this build doesn't register (which
+            # 500s and would otherwise sink the whole report).
+            available = self._comfy.list_model_folders()
+            models = self._comfy.fetch_available_models(available)
+            models_by_folder = self._comfy.fetch_models_by_folder(available)
         except Exception as error:  # noqa: BLE001
             log("Failed to fetch models", error)
             return

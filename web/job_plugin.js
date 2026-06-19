@@ -16,7 +16,8 @@ app.registerExtension({
       category: ["StableArt Job Node", "Connection", "Broker URL"],
       type: "text",
       defaultValue: "https://broker.stableart.io",
-      tooltip: "Node broker base URL (http/https, auto-upgraded to ws/wss). Restart ComfyUI to apply.",
+      tooltip:
+        "Node broker base URL (http/https, auto-upgraded to ws/wss). Restart ComfyUI to apply.",
     },
     {
       id: "stableart.apiKey",
@@ -24,7 +25,8 @@ app.registerExtension({
       category: ["StableArt Job Node", "Connection", "API key"],
       type: "text",
       defaultValue: "",
-      tooltip: "Operator API key (owner/admin). Stored locally in comfy.settings.json. Restart ComfyUI to apply.",
+      tooltip:
+        "Operator API key (owner/admin). Stored locally in comfy.settings.json. Restart ComfyUI to apply.",
     },
     {
       id: "stableart.nodeName",
@@ -32,7 +34,8 @@ app.registerExtension({
       category: ["StableArt Job Node", "Identity", "Node name"],
       type: "text",
       defaultValue: "",
-      tooltip: "Label shown in the StableArt dashboard. Restart ComfyUI to apply.",
+      tooltip:
+        "Label shown in the StableArt dashboard. Restart ComfyUI to apply.",
     },
   ],
 });

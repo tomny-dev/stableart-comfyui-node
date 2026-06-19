@@ -1,5 +1,6 @@
 [project]
 name = "stableart-comfyui-node"
+# Keep in sync with comfyui_job_plugin/version.py __version__ (reported to the dashboard).
 version = "0.2.2"
 description = "StableArt GPU worker as a ComfyUI custom node: connects to the StableArt node broker and runs image-generation and ai-caption jobs on the local ComfyUI."
 requires-python = ">=3.10"

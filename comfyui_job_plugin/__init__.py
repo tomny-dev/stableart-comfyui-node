@@ -8,5 +8,6 @@ image-generation and ai-caption jobs against the local ComfyUI HTTP API.
 
 from comfyui_job_plugin import runtime
 from comfyui_job_plugin.runtime import PROTOCOL_VERSION
+from comfyui_job_plugin.version import __version__
 
-__all__ = ["runtime", "PROTOCOL_VERSION"]
+__all__ = ["runtime", "PROTOCOL_VERSION", "__version__"]
